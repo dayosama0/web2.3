@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GEvidence MVP – Cases</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 920px; margin: 32px auto; padding: 0 16px; }
+    h1 { margin-bottom: 6px; }
+    .muted { color: #666; margin-top: 0; }
+    form { display: grid; gap: 10px; margin: 18px 0 24px; padding: 14px; border: 1px solid #ddd; border-radius: 10px; }
+    input, select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    button { padding: 10px; border-radius: 8px; border: 0; cursor: pointer; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+    .small { font-size: 12px; color: #777; }
+    .error { color: #b00020; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>GEvidence – Verification Cases</h1>
+  <p class="muted">Simple interface: view cases and create a new case.</p>
+
+  <form id="caseForm">
+    <div class="row">
+      <input id="title" placeholder="Title (required)" required />
+      <input id="orgId" placeholder="orgId (required)" required />
+    </div>
+
+    <div class="row">
+      <input id="country" placeholder="Country (required)" required />
+      <input id="city" placeholder="City (required)" required />
+    </div>
+
+    <div class="row">
+      <input id="metricKey" placeholder="Metric key (required) e.g. renewable_kwh" required />
+      <input id="metricUnit" placeholder="Metric unit (required) e.g. kWh" required />
+    </div>
+
+    <div class="row">
+      <input id="periodFrom" placeholder="Period from (ISO date) e.g. 2025-12-01" required />
+      <input id="periodTo" placeholder="Period to (ISO date) e.g. 2025-12-31" required />
+    </div>
+
+    <div class="row">
+      <input id="standard" placeholder="Methodology standard (required) e.g. GHG Protocol" required />
+      <input id="approach" placeholder="Methodology approach (required)" required />
+    </div>
+
+    <select id="status">
+      <option value="draft">draft</option>
+      <option value="in_review">in_review</option>
+      <option value="verified">verified</option>
+      <option value="rejected">rejected</option>
+    </select>
+
+    <button type="submit">Create Case</button>
+    <div id="err" class="error"></div>
+  </form>
+
+  <h2>Cases</h2>
+  <div id="list"></div>
+
+  <script>
+    async function loadCases() {
+      const res = await fetch("/cases");
+      const data = await res.json();
+
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = "<p class='muted'>No cases yet. Create the first one.</p>";
+        return;
+      }
+
+      for (const c of data) {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.innerHTML = `
+          <div><strong>${c.title}</strong></div>
+          <div class="small">ID: ${c._id}</div>
+          <div class="small">orgId: ${c.orgId} • status: ${c.status}</div>
+          <div class="small">metric: ${c.metric?.key} (${c.metric?.unit})</div>
+          <div class="small">site: ${c.site?.country}, ${c.site?.city}</div>
+        `;
+        list.appendChild(el);
+      }
+    }
+
+    document.getElementById("caseForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      document.getElementById("err").textContent = "";
+
+      const payload = {
+        title: document.getElementById("title").value,
+        orgId: document.getElementById("orgId").value,
+        site: {
+          country: document.getElementById("country").value,
+          city: document.getElementById("city").value
+        },
+        metric: {
+          key: document.getElementById("metricKey").value,
+          unit: document.getElementById("metricUnit").value
+        },
+        period: {
+          from: new Date(document.getElementById("periodFrom").value).toISOString(),
+          to: new Date(document.getElementById("periodTo").value).toISOString()
+        },
+        methodology: {
+          standard: document.getElementById("standard").value,
+          approach: document.getElementById("approach").value
+        },
+        status: document.getElementById("status").value
+      };
+
+      const res = await fetch("/cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById("err").textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+
+      e.target.reset();
+      await loadCases();
+    });
+
+    loadCases();
+  </script>
+</body>
+</html>
